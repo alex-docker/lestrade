@@ -16,6 +16,7 @@ import (
 type HttpApiFunc func(s Server, w http.ResponseWriter, r *http.Request) error
 
 func createServer(s Server, graphDriver string) {
+	go log.Println("Creating introspection server for", s.container.Id)
 	sockPath := fmt.Sprintf("%s/%s/mnt/%s/lestrade.sock", *graphDir, graphDriver, s.container.Id)
 
 	if err := syscall.Unlink(sockPath); err != nil && !os.IsNotExist(err) {

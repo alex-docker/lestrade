@@ -25,6 +25,7 @@ func (s *Server) monitor(l net.Listener, sock string) {
 			break
 		}
 	}
+	go log.Println("Stopping introspection server for", s.container.Id)
 	l.Close()
 }
 
@@ -54,7 +55,6 @@ func main() {
 			if c.State.Running {
 				server := Server{c, client, make(chan bool)}
 				Servers[c.Id] = server
-				log.Printf("Creating introspection server for %s", c.Id)
 				go createServer(server, daemonInfo.Driver)
 			}
 		}
@@ -82,7 +82,7 @@ func handleStartEvent(e *docker.Event, client docker.Docker, graphDriver string)
 	if err != nil {
 		return
 	}
-	log.Printf("Creating introspection server for %s", c.Id)
+
 	if _, exists := Servers[c.Id]; !exists {
 		s := Server{c, client, make(chan bool)}
 		createServer(s, graphDriver)
@@ -97,7 +97,6 @@ func handleStopEvent(e *docker.Event, client docker.Docker, graphDriver string) 
 	if err != nil {
 		return
 	}
-	log.Printf("Stopping introspection server for %s", c.Id)
 
 	if s, exists := Servers[c.Id]; exists {
 		s.sigChan <- true
