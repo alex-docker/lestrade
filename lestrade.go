@@ -47,6 +47,10 @@ func main() {
 
 	go func() {
 		for _, c := range containers {
+			c, err = client.FetchContainer(c.Id)
+			if err != nil {
+				continue
+			}
 			if c.State.Running {
 				server := Server{c, client, make(chan bool)}
 				Servers[c.Id] = server
