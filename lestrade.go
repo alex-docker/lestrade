@@ -20,7 +20,6 @@ type Server struct {
 }
 
 func (s *Server) monitor(l net.Listener) {
-	log.Println("Starting monitor for:", s.container.Id)
 	for sig := range s.sigChan {
 		if sig {
 			break
