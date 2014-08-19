@@ -40,7 +40,7 @@ func createServer(s Server, graphDriver string) {
 
 	l, err := net.Listen("unix", sockPath)
 	if err != nil {
-		log.Println("Listen: %s", err)
+		log.Println("Listen:", err)
 		return
 	}
 
