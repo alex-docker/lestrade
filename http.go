@@ -83,6 +83,6 @@ func writeJson(w http.ResponseWriter, data interface{}) error {
 		http.Error(w, "Error", 500)
 		return err
 	}
-	fmt.Fprint(w, string(d))
+	w.Write(d)
 	return nil
 }
