@@ -33,9 +33,6 @@ There are endpoinds for `/inspect`, `/name`, and `/id` currently.
 ```bash
 # from within a container after starting lestrade
 apt-get update && apt-get install -y socat curl
-socat TCP-LISTEN:80,fork,reuseaddr unix:/lestrade.sock
+socat TCP-LISTEN:80,fork,reuseaddr unix:/lestrade.sock # Make this curlable
 curl localhost/inspect
 ```
-
-## TODO
-1. Watch the docker event stream to capture new containers

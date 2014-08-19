@@ -1,29 +1,32 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net"
-	"net/http"
-	"os"
-	"strings"
-	"syscall"
 
 	"github.com/cpuguy83/docker-grand-ambassador/docker"
-	"github.com/gorilla/mux"
 )
 
 var socket = flag.String("sock", "/var/run/docker.sock", "Path to Docker socket")
 var graphDir = flag.String("g", "/docker", "Path to Docker graph")
 
+var Servers = map[string]Server{}
+
 type Server struct {
 	container *docker.Container
 	client    docker.Docker
+	sigChan   chan bool
 }
 
-type HttpApiFunc func(s Server, w http.ResponseWriter, r *http.Request) error
+func (s *Server) monitor(l net.Listener, sock string) {
+	for sig := range s.sigChan {
+		if sig {
+			break
+		}
+	}
+	l.Close()
+}
 
 func main() {
 	flag.Parse()
@@ -42,82 +45,57 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var servers = map[string]Server{}
+	go func() {
+		for _, c := range containers {
+			if c.State.Running {
+				server := Server{c, client, make(chan bool)}
+				Servers[c.Id] = server
+				log.Printf("Creating introspection server for %s", c.Id)
+				go createServer(server, daemonInfo.Driver)
+			}
+		}
+	}()
 
-	for _, c := range containers {
-		server := Server{c, client}
-		servers[c.Id] = server
-		go createServer(server, daemonInfo.Driver)
-	}
+	events := client.GetEvents()
+	go handleEvents(events, client, daemonInfo.Driver)
+
 	<-make(chan struct{})
 }
 
-func createServer(s Server, graphDriver string) {
-	sockPath := fmt.Sprintf("%s/%s/mnt/%s/lestrade.sock", *graphDir, graphDriver, s.container.Id)
-
-	if err := syscall.Unlink(sockPath); err != nil && !os.IsNotExist(err) {
-		log.Print(err)
-		return
-	}
-
-	inspectHandler := makeHttpHandler(s, getContainer)
-	nameHandler := makeHttpHandler(s, getContainerName)
-	idHandler := makeHttpHandler(s, getContainerId)
-
-	r := mux.NewRouter()
-
-	r.HandleFunc("/inspect", inspectHandler).Methods("Get")
-	r.HandleFunc("/name", nameHandler).Methods("Get")
-	r.HandleFunc("/id", idHandler).Methods("Get")
-
-	l, err := net.Listen("unix", sockPath)
-	if err != nil {
-		log.Fatalf("Listen: %s", err)
-		return
-	}
-
-	httpSrv := http.Server{Addr: sockPath, Handler: r}
-	httpSrv.Serve(l)
-}
-
-func getContainer(s Server, w http.ResponseWriter, r *http.Request) error {
-	c, err := s.client.FetchContainer(s.container.Id)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error: %", err), 500)
-	}
-	writeJson(w, c)
-	return nil
-}
-
-func getContainerName(s Server, w http.ResponseWriter, r *http.Request) error {
-	c, err := s.client.FetchContainer(s.container.Id)
-	if err != nil {
-		http.Error(w, "Error fetching container", 500)
-		return err
-	}
-
-	return writeJson(w, strings.TrimPrefix(c.Name, "/"))
-}
-func getContainerId(s Server, w http.ResponseWriter, r *http.Request) error {
-	return writeJson(w, s.container.Id)
-}
-
-func makeHttpHandler(s Server, h HttpApiFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := h(s, w, r); err != nil {
-			log.Print(err)
+func handleEvents(eventChan chan *docker.Event, client docker.Docker, graphDriver string) {
+	for e := range eventChan {
+		switch e.Status {
+		case "start":
+			go handleStartEvent(e, client, graphDriver)
+		case "stop":
+			go handleStopEvent(e, client, graphDriver)
 		}
 	}
 }
 
-func writeJson(w http.ResponseWriter, data interface{}) error {
-	w.Header().Set("Content-Type", "application/json")
-
-	d, err := json.Marshal(data)
+func handleStartEvent(e *docker.Event, client docker.Docker, graphDriver string) {
+	c, err := client.FetchContainer(e.ContainerId)
 	if err != nil {
-		http.Error(w, "Error", 500)
-		return err
+		return
 	}
-	fmt.Fprint(w, string(d))
-	return nil
+	log.Printf("Creating introspection server for %s", c.Id)
+	if _, exists := Servers[c.Id]; !exists {
+		s := Server{c, client, make(chan bool)}
+		createServer(s, graphDriver)
+		return
+	}
+
+	createServer(Servers[c.Id], graphDriver)
+}
+
+func handleStopEvent(e *docker.Event, client docker.Docker, graphDriver string) {
+	c, err := client.FetchContainer(e.ContainerId)
+	if err != nil {
+		return
+	}
+	log.Printf("Stopping introspection server for %s", c.Id)
+
+	if s, exists := Servers[c.Id]; exists {
+		s.sigChan <- true
+	}
 }
