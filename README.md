@@ -8,7 +8,7 @@ For insance, have you ever wanted to know the name or ID of a container while
 inside the container?
 Or perhaps the host port for a given exposed port within the container?
 
-Lastrade provides access to this for each of your containers without leaking
+Lestrade provides access to this for each of your containers without leaking
 information about other containers.
 Each container has it's own scoped access to its own information and only its
 own information.
