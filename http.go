@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type HttpApiFunc func(s Server, w http.ResponseWriter, r *http.Request) error
+type HttpApiFunc func(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error
 
 func createServer(s Server, graphDriver string) {
 	go log.Println("Creating introspection server for", s.container.Id)
@@ -24,15 +24,7 @@ func createServer(s Server, graphDriver string) {
 		return
 	}
 
-	inspectHandler := makeHttpHandler(s, getContainer)
-	nameHandler := makeHttpHandler(s, getContainerName)
-	idHandler := makeHttpHandler(s, getContainerId)
-
-	r := mux.NewRouter()
-
-	r.HandleFunc("/inspect", inspectHandler).Methods("Get")
-	r.HandleFunc("/name", nameHandler).Methods("Get")
-	r.HandleFunc("/id", idHandler).Methods("Get")
+	r := createRouter(s)
 
 	l, err := net.Listen("unix", sockPath)
 	if err != nil {
@@ -46,7 +38,34 @@ func createServer(s Server, graphDriver string) {
 	httpSrv.Serve(l)
 }
 
-func getContainer(s Server, w http.ResponseWriter, r *http.Request) error {
+func createRouter(s Server) *mux.Router {
+	r := mux.NewRouter()
+	m := map[string]map[string]HttpApiFunc{
+		"GET": {
+			"/inspect":     getContainer,
+			"/name":        getContainerName,
+			"/id":          getContainerId,
+			"/port/{port}": getContainerPort,
+		},
+	}
+
+	for method, routes := range m {
+		for route, fct := range routes {
+			f := makeHttpHandler(s, fct)
+
+			if route == "" {
+				r.Methods(method).HandlerFunc(f)
+				continue
+			}
+
+			r.Path(route).Methods(method).HandlerFunc(f)
+		}
+	}
+
+	return r
+}
+
+func getContainer(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	c, err := s.client.FetchContainer(s.container.Id)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error: %", err), 500)
@@ -55,7 +74,7 @@ func getContainer(s Server, w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func getContainerName(s Server, w http.ResponseWriter, r *http.Request) error {
+func getContainerName(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	c, err := s.client.FetchContainer(s.container.Id)
 	if err != nil {
 		http.Error(w, "Error fetching container", 500)
@@ -64,13 +83,37 @@ func getContainerName(s Server, w http.ResponseWriter, r *http.Request) error {
 
 	return writeJson(w, strings.TrimPrefix(c.Name, "/"))
 }
-func getContainerId(s Server, w http.ResponseWriter, r *http.Request) error {
+func getContainerId(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	return writeJson(w, s.container.Id)
+}
+
+func getContainerPort(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	c, err := s.client.FetchContainer(s.container.Id)
+	if err != nil {
+		http.Error(w, "Could not fetch container", 500)
+		return err
+	}
+
+	var binds = []string{}
+	for portStr, binding := range c.HostConfig.PortBindings {
+		if strings.TrimSuffix(portStr, "/tcp") == vars["port"] || strings.TrimSuffix(portStr, "/udp") == vars["port"] {
+			for _, b := range binding {
+				if b.HostPort != "" {
+					if b.HostIp == "" {
+						b.HostIp = "0.0.0.0"
+					}
+					binds = append(binds, fmt.Sprintf("%s:%s", b.HostIp, b.HostPort))
+				}
+			}
+			return writeJson(w, binds)
+		}
+	}
+	return writeJson(w, binds)
 }
 
 func makeHttpHandler(s Server, h HttpApiFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := h(s, w, r); err != nil {
+		if err := h(s, w, r, mux.Vars(r)); err != nil {
 			log.Print(err)
 		}
 	}
