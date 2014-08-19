@@ -19,7 +19,7 @@ func createServer(s Server, graphDriver string) {
 	log.Println("Creating introspection server for", s.container.Id)
 	var sockPath string
 	switch graphDriver {
-	case "devmaper":
+	case "devicemapper":
 		sockPath = fmt.Sprintf("%s/%s/mnt/%s/rootfs/int.sock", *graphDir, graphDriver, s.container.Id)
 	default:
 		sockPath = fmt.Sprintf("%s/%s/mnt/%s/int.sock", *graphDir, graphDriver, s.container.Id)
