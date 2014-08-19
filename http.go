@@ -40,7 +40,7 @@ func createServer(s Server, graphDriver string) {
 		return
 	}
 
-	go s.monitor(l, sockPath)
+	go s.monitor(l)
 
 	httpSrv := http.Server{Addr: sockPath, Handler: r}
 	httpSrv.Serve(l)

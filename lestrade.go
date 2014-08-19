@@ -19,7 +19,7 @@ type Server struct {
 	sigChan   chan bool
 }
 
-func (s *Server) monitor(l net.Listener, sock string) {
+func (s *Server) monitor(l net.Listener) {
 	for sig := range s.sigChan {
 		if sig {
 			break
@@ -85,6 +85,7 @@ func handleStartEvent(e *docker.Event, client docker.Docker, graphDriver string)
 
 	if _, exists := Servers[c.Id]; !exists {
 		s := Server{c, client, make(chan bool)}
+		Servers[c.Id] = s
 		createServer(s, graphDriver)
 		return
 	}
