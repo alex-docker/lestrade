@@ -10,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/docker/docker/pkg/symlink"
 	"github.com/gorilla/mux"
 )
 
@@ -24,12 +23,6 @@ func createServer(s Server, graphDriver string) {
 		sockPath = fmt.Sprintf("%s/%s/mnt/%s/rootfs/int.sock", *graphDir, graphDriver, s.container.Id)
 	default:
 		sockPath = fmt.Sprintf("%s/%s/mnt/%s/int.sock", *graphDir, graphDriver, s.container.Id)
-	}
-
-	sockPath, err := symlink.FollowSymlinkInScope(sockPath, *graphDir)
-	if err != nil {
-		log.Println("Error parsing socket path:", err)
-		return
 	}
 
 	if err := syscall.Unlink(sockPath); err != nil && !os.IsNotExist(err) {
