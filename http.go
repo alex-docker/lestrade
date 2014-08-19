@@ -16,8 +16,14 @@ import (
 type HttpApiFunc func(s Server, w http.ResponseWriter, r *http.Request, vars map[string]string) error
 
 func createServer(s Server, graphDriver string) {
-	go log.Println("Creating introspection server for", s.container.Id)
-	sockPath := fmt.Sprintf("%s/%s/mnt/%s/lestrade.sock", *graphDir, graphDriver, s.container.Id)
+	log.Println("Creating introspection server for", s.container.Id)
+	var sockPath string
+	switch graphDriver {
+	case "devmaper":
+		sockPath = fmt.Sprintf("%s/%s/mnt/%s/rootfs/int.sock", *graphDir, graphDriver, s.container.Id)
+	default:
+		sockPath = fmt.Sprintf("%s/%s/mnt/%s/int.sock", *graphDir, graphDriver, s.container.Id)
+	}
 
 	if err := syscall.Unlink(sockPath); err != nil && !os.IsNotExist(err) {
 		log.Print(err)
