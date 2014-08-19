@@ -20,6 +20,7 @@ type Server struct {
 }
 
 func (s *Server) monitor(l net.Listener) {
+	log.Println("Starting monitor for:", s.container.Id)
 	for sig := range s.sigChan {
 		if sig {
 			break
@@ -69,9 +70,9 @@ func main() {
 func handleEvents(eventChan chan *docker.Event, client docker.Docker, graphDriver string) {
 	for e := range eventChan {
 		switch e.Status {
-		case "start":
+		case "start", "restart":
 			go handleStartEvent(e, client, graphDriver)
-		case "stop":
+		case "stop", "die", "kill":
 			go handleStopEvent(e, client, graphDriver)
 		}
 	}
@@ -80,26 +81,19 @@ func handleEvents(eventChan chan *docker.Event, client docker.Docker, graphDrive
 func handleStartEvent(e *docker.Event, client docker.Docker, graphDriver string) {
 	c, err := client.FetchContainer(e.ContainerId)
 	if err != nil {
+		log.Println("EventStart: Could not fetch container:", err)
 		return
 	}
 
 	if _, exists := Servers[c.Id]; !exists {
 		s := Server{c, client, make(chan bool)}
 		Servers[c.Id] = s
-		createServer(s, graphDriver)
-		return
 	}
-
 	createServer(Servers[c.Id], graphDriver)
 }
 
 func handleStopEvent(e *docker.Event, client docker.Docker, graphDriver string) {
-	c, err := client.FetchContainer(e.ContainerId)
-	if err != nil {
-		return
-	}
-
-	if s, exists := Servers[c.Id]; exists {
+	if s, exists := Servers[e.ContainerId]; exists {
 		s.sigChan <- true
 	}
 }

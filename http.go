@@ -40,7 +40,7 @@ func createServer(s Server, graphDriver string) {
 
 	l, err := net.Listen("unix", sockPath)
 	if err != nil {
-		log.Fatalf("Listen: %s", err)
+		log.Println("Listen: %s", err)
 		return
 	}
 
@@ -126,7 +126,7 @@ func getContainerPort(s Server, w http.ResponseWriter, r *http.Request, vars map
 func makeHttpHandler(s Server, h HttpApiFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := h(s, w, r, mux.Vars(r)); err != nil {
-			log.Print(err)
+			log.Println("Could not create handler:", err)
 		}
 	}
 }
