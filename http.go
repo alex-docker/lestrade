@@ -47,10 +47,10 @@ func createRouter(s Server) *mux.Router {
 	r := mux.NewRouter()
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/inspect":     getContainer,
-			"/name":        getContainerName,
-			"/id":          getContainerId,
-			"/port/{port}": getContainerPort,
+			"/inspect":      getContainer,
+			"/name":         getContainerName,
+			"/id":           getContainerId,
+			"/ports/{port}": getContainerPort,
 		},
 	}
 
