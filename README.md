@@ -34,3 +34,16 @@ apt-get update && apt-get install -y socat curl
 socat TCP-LISTEN:80,fork,reuseaddr unix:/lestrade.sock # Make this curlable
 curl localhost/inspect
 ```
+
+## Issues
+Can't be run in a container.  This is because when bind-mounting in the
+docker graph dir (e.g. /var/lib/docker) we are unable to pickup newly
+created containers.
+
+Doing things like `docker rm -f <container>` will always return an error
+if lestrade is running.
+This is because docker will be trying to remove the container before
+lestrade can successfully close the introspection socket.
+
+## TODO
+Make this a PR to Docker
