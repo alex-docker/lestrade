@@ -15,13 +15,11 @@ own information.
 
 ## Usage
 ```bash
+# From the host
 git clone git@github.com/cpuguy83/lestrade
 cd lestrade
-docker build -t lestrade .
-docker run -d \
-  -v /var/lib/docker:/docker \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  lestrade
+./make.sh
+./lestrade -g /var/lib/docker -socket /var/run/docker.sock
 ```
 
 The lestrade socket will be placed into /lestrade.sock within all of your
