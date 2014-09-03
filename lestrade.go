@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/cpuguy83/docker-grand-ambassador/docker"
+	"github.com/cpuguy83/dockerclient"
 )
 
 var socket = flag.String("sock", "/var/run/docker.sock", "Path to Docker socket")
@@ -36,7 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	containers, err := client.FetchAllContainers()
+	containers, err := client.FetchAllContainers(true)
 	if err != nil {
 		log.Fatal(err)
 	}
